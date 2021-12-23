@@ -1,0 +1,229 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <signal.h>
+#define MAXLEN 1000
+
+char command[1000], pathname[1000];
+int count = 0;
+
+int fds[100][2];
+int fdsc = 0;
+int linecount = 0;
+int opCnt = 0;
+char ch;
+char *arg[MAXLEN];
+int argC = 0;
+int child() {
+
+        //rewrite the pipes for fds 0, 1 & 3 before invoking add/subtract/multiply/divide
+        //setup FD 0 for reading 1st parameter
+        close(0);
+        dup(fds[(fdsc)][0]);
+
+        //setup FD 1 for outputing the result
+        close(1);
+        dup(fds[(fdsc+1)][1]);
+
+    
+        execl("./execvp2", "execvp2", NULL, NULL);
+        fputs("I hope you do not see me!", stderr);
+        exit(1);
+}
+
+int innerChild() {
+
+        //rewrite the pipes for fds 0, 1 & 3 before invoking add/subtract/multiply/divide
+        //setup FD 0 for reading 1st parameter
+        close(0);
+        dup(fds[(fdsc)][0]);
+
+        //setup FD 3 for reading 2nd parameter
+        close(3);
+        dup(fds[(fdsc-1)][0]);
+
+        //setup FD 1 for outputing the result
+        close(1);
+        dup(fds[(fdsc+1)][1]);
+
+        
+        execl("./execvp2", "execvp2", NULL, NULL);
+        fputs("I hope you do not see me!", stderr);
+        exit(1);
+}
+
+
+
+void mywhich(char cmnd[1000]){
+	sprintf(command, "which %s", cmnd);
+        FILE *fp = popen(command, "r");
+        fgets(pathname, 1000, fp);
+        pclose(fp);
+
+
+}
+
+void vpInput(char line[]){
+	int i;
+	argC = 0;
+	char
+	int ccount = 0;
+                 int end;
+                 int start = 0;
+                 int equalCheck = 0;
+                 for (i = 0;i < strlen(line); i++)
+                 {
+                     if (line[i] == ' ' && line[i+1] != ' ')
+                         ccount++;
+
+                     
+                 }
+                ccount++;
+	for (i = 0; i < strlen(line); i++)
+                 {
+                     
+
+                     if (line[i] == ' ' || i == strlen(line) - 1)
+                     {
+                         
+                         
+                         end = i;
+                         
+                         sprintf(arg[argC],"%.*s", (end - start), line + start);
+                         start = i + 1;
+                         argC++;
+                     }
+                 }
+	arg[argC+1] = NULL;
+			
+
+
+
+}
+
+int quote(){
+	execl("./quoteserver", "quoteserver", "-v", NULL);
+        fputs("I hope you do not see me!", stderr);
+        exit(1);
+}
+
+int main(int argc, char *argv[]) {
+	while(1){
+	
+		fdsc = 0;
+		
+		count = 0;
+		if (fork() == 0){
+			quote();
+		}
+		wait();
+	
+		char str[MAXLEN];
+
+   
+   		 
+   		 fgets(str, MAXLEN, stdin);
+
+   		 int i;
+   		 int end;
+   		 int start = 0;
+		 int equalCheck = 0;
+		 for (i = 0;str[i] != '\0';i++)
+   		 {
+   		     if (str[i] == ' ' && (str[i+1] == '|' || str[i+1] == '=') && str[i+2] == ' ' && str[i+3] != ' ')
+   		         count++;
+
+	   	     if (str[i] == ' ' && str[i+1] == '=' && str[i+2] == ' ' && str[i+3] != ' ')
+			equalCheck = 1;    
+   		 }
+		count++;
+//   		printf("Number of commands in given string are: %d\n", count);    				
+		 char inputs[count][100]; 
+ 		 int count2 = 0;
+		 int innerCount = 0;
+		 int pipeCount = 0;
+		 int childCount = 0;
+   		 for (i = 0; i < strlen(str); i++)
+   		 {	
+		     if (str[i] == '\n'){
+			str[i] == '\0';
+		     }
+       
+   		     if (str[i] == '|' || str[i] == '=' || i == strlen(str) - 1)
+   		     {
+			 if (i == strlen(str) - 1){
+   		         end = i;
+			 }
+			 else {
+			 end = i-1;	
+			 }
+   		         sprintf(inputs[count2],"%.*s", (end - start), str + start);
+   		         start = i + 2;
+//			printf("%s\n", inputs[count2]);
+			 count2++;
+   		     }
+   		 }
+		
+
+		for (int l = 0; l < (2*count); l++){
+			pipe(fds[l]);
+		}
+		
+		if (count > 1){
+		for (int t = 0; t < count; t++){
+			if (t == 0){
+				if (fork() == 0){
+					child();
+				}
+			}
+			else {
+				if (fork() == 0){
+					innerChild();
+				}
+			}
+			fdsc = fdsc+2;
+		}
+		
+		
+		count2 = 0;
+		while (count2 < count){
+			char *output = NULL;
+			output = inputs[count2];
+		
+		if (write(fds[(count2*2)][1], output, (strlen(output)+1)) == 0){     
+		    exit(1);
+		}
+               
+               
+	
+			count2++;
+		
+		}
+		
+	
+		char buffer[4000] = {0};		
+		close(fds[((count*2)-1)][1]);
+		read(fds[((count*2)-1)][0], buffer, sizeof(buffer));
+		printf("%s\n",buffer);
+		wait(NULL);
+
+		}
+		else {
+		vpInput(inputs[0]);
+		if (fork() == 0)
+		{
+			execvp(arg[0], arg);
+		}
+		else{
+			wait(NULL);
+		}
+		}
+		
+
+		for (int k = 0; k < (2*count); k++){
+			close(fds[k][0]);
+			close(fds[k][1]);
+		}
+		}
+}
